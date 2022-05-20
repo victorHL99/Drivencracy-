@@ -2,11 +2,11 @@ import express,{json} from 'express';
 import chalk from 'chalk';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import {MongoClient} from 'mongodb';
 import {ObjectId} from 'mongodb';
 import joi from 'joi';
 import dayjs from 'dayjs';
 
-import dataBase from './dataBase.js';
 
 
 const app = express();
@@ -14,6 +14,19 @@ app.use(cors());
 app.use(json());
 dotenv.config();
 
+
+
+
+let dataBase = null;
+const mongoCliente = new MongoClient(process.env.MONGO_URL);
+const promise = mongoCliente.connect();
+promise.then(response =>{
+    dataBase = mongoCliente.db(process.env.DATABASE);
+    console.log(chalk.green.bold('Banco de dados conectado com sucesso'));
+});
+promise.catch(error =>{
+    console.log(chalk.red.bold('Erro ao conectar no banco de dados'));
+});
 
 
 //TODO - Rota para enviar a enquete /poll
@@ -43,10 +56,12 @@ app.post("/poll", async (req, res) => {
     }
 
     try{
+        console.log(chalk.green(`Enviando a enquete ${title}`));
         const response = await dataBase.collection('polls').insertOne(poll);
         res.status(201).send(response);
     }
     catch(error){
+        console.log(chalk.red(error));
         res.status(500).send(error);
     }
 
