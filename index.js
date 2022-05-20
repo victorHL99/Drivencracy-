@@ -2,9 +2,11 @@ import express,{json} from 'express';
 import chalk from 'chalk';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import {MongoClient, ObjectId} from 'mongodb';
+import {ObjectId} from 'mongodb';
 import joi from 'joi';
 import dayjs from 'dayjs';
+
+import dataBase from './dataBase.js';
 
 
 const app = express();
@@ -12,21 +14,11 @@ app.use(cors());
 app.use(json());
 dotenv.config();
 
-let dataBase = null;
-const mongoCliente = new MongoClient(process.env.MONGO_URL);
-const promise = mongoCliente.connect();
-promise.then(response =>{
-    dataBase = mongoCliente.db(process.env.DATABASE);
-    console.log(chalk.green.bold('Banco de dados conectado com sucesso'));
-});
-promise.catch(error =>{
-    console.log(chalk.red.bold('Erro ao conectar no banco de dados'));
-});
+
 
 //TODO - Rota para enviar a enquete /poll
 
 app.post("/poll", async (req, res) => {
-    console.log("Enquete enviada");
     const {title, expireAt} = req.body;
     const addDays = (30 * 86400000) // 30 dias em milisegundos
     const novaData = Date.now() + addDays; ;
@@ -45,7 +37,6 @@ app.post("/poll", async (req, res) => {
     }
 
     const validatePoll = pollSchema.validate({title});
-    console.log(validatePoll);
     if(validatePoll.error){
         res.sendStatus(422);
         return;
@@ -53,10 +44,10 @@ app.post("/poll", async (req, res) => {
 
     try{
         const response = await dataBase.collection('polls').insertOne(poll);
-        res.send(response).status(201);
+        res.status(201).send(response);
     }
     catch(error){
-        res.send(error).status(500);
+        res.status(500).send(error);
     }
 
 });
@@ -66,10 +57,10 @@ app.get("/poll", async (req, res) => {
 
     try{
         const polls = await dataBase.collection('polls').find({}).toArray();
-        res.send(polls).status(200);
+        res.status(200).send(polls);
     }
     catch(error){
-        res.send(error).status(500);
+        res.status(500).send(error);
     }
 })
 
@@ -112,10 +103,10 @@ app.post("/choice", async (req, res) => {
         }
 
         const response = await dataBase.collection('choices').insertOne({title, pollId, votes});
-        res.send(response).status(201);
+        res.status(201).send(response);
     }
     catch(error){
-        res.send(error).status(500);
+        res.status(500).send(error);
     }
 
 })
@@ -130,11 +121,11 @@ app.get(`/poll/:id/choice`, async (req, res) => {
             res.sendStatus(404);
             return;
         }
-        res.send(choices).status(200);
+        res.status(200).send(choices);
 
     }
     catch(error){
-        res.send(error).status(500);
+        res.status(500).send(error);
     }
 });
 
@@ -142,18 +133,20 @@ app.get(`/poll/:id/choice`, async (req, res) => {
 app.post(`/choice/:id/vote`, async (req, res) => {
     const {id} = req.params;
     try{
-        console.log("entrou aqui");
         const choices = await dataBase.collection('choices').find({_id: new ObjectId(id)}).toArray();
-        console.log("passou aqui",choices);
+        const poll = await dataBase.collection('polls').find({_id: new ObjectId(choices[0].pollId)}).toArray();
         
-        console.log(choices.length);
         const choice = choices[0];
-        console.log(choices[0])
-
         if(choices.length === 0){
             res.sendStatus(404);
             return;
         }
+
+        if(poll[0].expireAt < Date.now()){
+            res.sendStatus(403);
+            return;
+        }
+
 
         const newVotes = choice.votes + 1;
         const response = await dataBase.collection('choices').updateOne({_id: new ObjectId(id)}, {$set: {votes: newVotes}});
@@ -161,7 +154,6 @@ app.post(`/choice/:id/vote`, async (req, res) => {
         res.status(201).send(response);
     }
     catch(error){
-        console.log(error)
         res.status(500).send(JSON.stringify(error));
     
     }
@@ -184,8 +176,6 @@ app.get(`/poll/:id/result`, async (req, res) => {
                 title = choice.title;
             }
         })
-        console.log(votes)
-        console.log(title)
         const result = {
             _id: id,
             title: poll[0].title,
@@ -196,15 +186,16 @@ app.get(`/poll/:id/result`, async (req, res) => {
             }
 
         }
-        res.send(result).status(200);
+        res.status(200).send(result);
 
     }
     catch(error){
-        res.send(error).status(500);
+        res.status(500).send(error);
     }
 })
 
 
-app.listen(5000,()=>{
-    console.log(chalk.green.bold(`Server is running on port 5000`));
+const port = process.env.PORT || 5000;
+app.listen(port,()=>{
+    console.log(chalk.green.bold(`Servidor rodando na porta ${port}`));
 });
