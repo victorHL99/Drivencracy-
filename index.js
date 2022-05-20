@@ -2,8 +2,7 @@ import express,{json} from 'express';
 import chalk from 'chalk';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import {MongoClient} from 'mongodb';
-import {ObjectId} from 'mongodb';
+import {MongoClient, ObjectId} from 'mongodb';
 import joi from 'joi';
 import dayjs from 'dayjs';
 
@@ -13,8 +12,6 @@ const app = express();
 app.use(cors());
 app.use(json());
 dotenv.config();
-
-
 
 
 let dataBase = null;
@@ -210,7 +207,7 @@ app.get(`/poll/:id/result`, async (req, res) => {
 })
 
 
-const port = process.env.PORT || 5000;
+const port = process.env.PORT ;
 app.listen(port,()=>{
     console.log(chalk.green.bold(`Servidor rodando na porta ${port}`));
 });
