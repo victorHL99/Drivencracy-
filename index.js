@@ -2,7 +2,7 @@ import express,{json} from 'express';
 import chalk from 'chalk';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import {MongoClient} from 'mongodb';
+import {MongoClient, ObjectId} from 'mongodb';
 import joi from 'joi';
 import dayjs from 'dayjs';
 
@@ -76,6 +76,7 @@ app.get("/poll", async (req, res) => {
 //TODO - Rota para criar a escolhas da enquetes /choice
 app.post("/choice", async (req, res) => {
     const {title, pollId} = req.body;
+    const votes = 0;
 
     try{
         const polls = await dataBase.collection('polls').find({}).toArray();
@@ -110,7 +111,7 @@ app.post("/choice", async (req, res) => {
             return;
         }
 
-        const response = await dataBase.collection('choices').insertOne({title, pollId});
+        const response = await dataBase.collection('choices').insertOne({title, pollId, votes});
         res.send(response).status(201);
     }
     catch(error){
@@ -136,6 +137,73 @@ app.get(`/poll/:id/choice`, async (req, res) => {
         res.send(error).status(500);
     }
 });
+
+//TODO - Rota para enviar votos /vote
+app.post(`/choice/:id/vote`, async (req, res) => {
+    const {id} = req.params;
+    try{
+        console.log("entrou aqui");
+        const choices = await dataBase.collection('choices').find({_id: new ObjectId(id)}).toArray();
+        console.log("passou aqui",choices);
+        
+        console.log(choices.length);
+        const choice = choices[0];
+        console.log(choices[0])
+
+        if(choices.length === 0){
+            res.sendStatus(404);
+            return;
+        }
+
+        const newVotes = choice.votes + 1;
+        const response = await dataBase.collection('choices').updateOne({_id: new ObjectId(id)}, {$set: {votes: newVotes}});
+
+        res.status(201).send(response);
+    }
+    catch(error){
+        console.log(error)
+        res.status(500).send(JSON.stringify(error));
+    
+    }
+})
+
+//TODO - Rota para receber os votos /vote
+app.get(`/poll/:id/result`, async (req, res) => {
+    const {id} = req.params;
+    
+
+    try{
+        const choices = await dataBase.collection('choices').find({pollId: id}).toArray();
+        const poll = await dataBase.collection('polls').find({_id: ObjectId(id)}).toArray();
+
+        let votes = 0;
+        let title = '';
+        choices.forEach(choice => {
+            if(choice.votes > votes){
+                votes = choice.votes;
+                title = choice.title;
+            }
+        })
+        console.log(votes)
+        console.log(title)
+        const result = {
+            _id: id,
+            title: poll[0].title,
+            expireAt: poll[0].expireAt,
+            result:{
+                title,
+                votes
+            }
+
+        }
+        res.send(result).status(200);
+
+    }
+    catch(error){
+        res.send(error).status(500);
+    }
+})
+
 
 app.listen(5000,()=>{
     console.log(chalk.green.bold(`Server is running on port 5000`));
